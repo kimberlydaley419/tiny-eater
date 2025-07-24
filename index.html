@@ -779,6 +779,25 @@
   }
 }
 
+function setReaction(reaction) {
+  currentReaction = reaction;
+  
+  // Clear any existing reaction error
+  const reactionError = document.getElementById('reaction-error');
+  if (reactionError) {
+    reactionError.remove();
+  }
+  
+  document.querySelectorAll('[id^="reaction-"]').forEach(btn => {
+    btn.className = 'flex-1 px-3 py-3 rounded-full border-2 transition-all border-gray-200 hover:border-gray-300';
+  });
+  
+  const btn = document.getElementById(`reaction-${reaction}`);
+  if (btn) {
+    btn.className = 'flex-1 px-3 py-3 rounded-full border-2 transition-all bg-tiny-yellow-light border-tiny-yellow';
+  }
+}
+
     function deleteFood(id) {
       if (confirm('Are you sure you want to delete this food entry?')) {
         foods = foods.filter(f => f.id !== id);
