@@ -18,7 +18,7 @@
   <!-- Additional PWA meta tags -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="application-name" content="Tiny Eater">
-  
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=KoHo:wght@200;300;400;500;600;700&display=swap" rel="stylesheet"> 
@@ -58,6 +58,10 @@
     .tile.active .tile-actions { opacity: 1; }
     .field-error { border-color: #FF2222 !important; border-width: 2px !important; }
     .error-message { color: #FF2222; font-size: 0.75rem; margin-top: 0.25rem; }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -276,6 +280,7 @@
     let editingFood = null;
     let currentReaction = '';
     let currentMediaPreview = null;
+    let isSaving = false;
 
     // 100 Foods Checklist Data
     const foodsChecklist = {
@@ -640,26 +645,22 @@
     }
 
     function closeModal() {
-      document.getElementById('food-modal').classList.add('hidden');
-    }
-
-    function setReaction(reaction) {
-      currentReaction = reaction;
-      
-      document.querySelectorAll('[id^="reaction-"]').forEach(btn => {
-        btn.className = 'flex-1 p-3 rounded-full border-2 transition-all text-center border-tiny-yellow hover:border-gray-300';
-      });
-      
-      const btn = document.getElementById(`reaction-${reaction}`);
-      if (btn) {
-        const colors = {
-          'loved': 'bg-tiny-yellow-light border-tiny-yellow',
-          'Meh': 'bg-tiny-yellow-light border-tiny-yellow',
-          'hated': 'bg-tiny-yellow-light border-tiny-yellow'
-        };
-        btn.className = `flex-1 p-3 rounded-full border-2 transition-all text-center ${colors[reaction]}`;
-      }
-    }
+  // Reset saving state when modal closes
+  isSaving = false;
+  
+  // Reset button state
+  const saveButton = document.getElementById('save-food-btn');
+  saveButton.disabled = false;
+  saveButton.textContent = editingFood ? 'Update Food' : 'Save Food';
+  
+  // Clear any reaction error
+  const reactionError = document.getElementById('reaction-error');
+  if (reactionError) {
+    reactionError.remove();
+  }
+  
+  document.getElementById('food-modal').classList.add('hidden');
+}
 
     function handlePhotoUpload(event) {
       const file = event.target.files[0];
@@ -680,51 +681,103 @@
     }
 
     function saveFood() {
-      clearValidationErrors();
-      
-      const name = document.getElementById('food-name').value.trim();
-      const date = document.getElementById('food-date').value;
-      const notes = document.getElementById('food-notes').value.trim();
-      
-      let hasErrors = false;
-      
-      if (!name) {
-        showFieldError('food-name', 'food-name-error');
-        hasErrors = true;
-      }
-      
-      if (!date) {
-        showFieldError('food-date', 'food-date-error');
-        hasErrors = true;
-      }
-      
-     
-      if (hasErrors) return;
-      
-      const foodData = {
-        name,
-        date,
-        reaction: currentReaction,
-        notes,
-        mediaPreview: currentMediaPreview,
-        mediaType: currentMediaPreview ? (currentMediaPreview.startsWith('data:image/') ? 'image' : 'video') : null
-      };
-      
-      if (editingFood) {
-        const index = foods.findIndex(f => f.id === editingFood.id);
-        if (index !== -1) {
-          foods[index] = { ...foodData, id: editingFood.id, dateAdded: editingFood.dateAdded };
-        }
-      } else {
-        foodData.id = Date.now();
-        foodData.dateAdded = new Date().toISOString();
-        foods.unshift(foodData);
-      }
-      
-      saveData();
-      renderFoods();
-      closeModal();
+  // Prevent multiple saves
+  if (isSaving) return;
+  isSaving = true;
+  
+  // Disable the save button to prevent multiple clicks
+  const saveButton = document.getElementById('save-food-btn');
+  const originalText = saveButton.textContent;
+  saveButton.disabled = true;
+  saveButton.textContent = 'Saving...';
+  
+  clearValidationErrors();
+  
+  const name = document.getElementById('food-name').value.trim();
+  const date = document.getElementById('food-date').value;
+  const notes = document.getElementById('food-notes').value.trim();
+  
+  let hasErrors = false;
+  
+  if (!name) {
+    showFieldError('food-name', 'food-name-error');
+    hasErrors = true;
+  }
+  
+  if (!date) {
+    showFieldError('food-date', 'food-date-error');
+    hasErrors = true;
+  }
+  
+  if (!currentReaction) {
+    // Add error display for missing reaction
+    const reactionContainer = document.querySelector('[id^="reaction-"]').parentElement;
+    if (reactionContainer) {
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'error-message text-center mt-2';
+      errorDiv.textContent = 'Please select a reaction';
+      errorDiv.id = 'reaction-error';
+      reactionContainer.appendChild(errorDiv);
     }
+    hasErrors = true;
+  }
+  
+  if (hasErrors) {
+    // Re-enable button if there are errors
+    saveButton.disabled = false;
+    saveButton.textContent = originalText;
+    isSaving = false;
+    return;
+  }
+  
+  try {
+    const foodData = {
+      name,
+      date,
+      reaction: currentReaction,
+      notes,
+      mediaPreview: currentMediaPreview,
+      mediaType: currentMediaPreview ? (currentMediaPreview.startsWith('data:image/') ? 'image' : 'video') : null
+    };
+    
+    if (editingFood) {
+      const index = foods.findIndex(f => f.id === editingFood.id);
+      if (index !== -1) {
+        foods[index] = { ...foodData, id: editingFood.id, dateAdded: editingFood.dateAdded };
+      }
+    } else {
+      foodData.id = Date.now() + Math.random(); // Ensure unique ID
+      foodData.dateAdded = new Date().toISOString();
+      foods.unshift(foodData);
+    }
+    
+    // Save data with error handling
+    try {
+      saveData();
+    } catch (error) {
+      console.error('Error saving data:', error);
+      alert('Error saving food. Please try again.');
+      // Re-enable button on save error
+      saveButton.disabled = false;
+      saveButton.textContent = originalText;
+      isSaving = false;
+      return;
+    }
+    
+    // Only render and close if save was successful
+    renderFoods();
+    closeModal();
+    
+  } catch (error) {
+    console.error('Error in saveFood:', error);
+    alert('An error occurred. Please try again.');
+  } finally {
+    // Always re-enable the button and reset saving state
+    saveButton.disabled = false;
+    saveButton.textContent = originalText;
+    isSaving = false;
+  }
+}
 
     function deleteFood(id) {
       if (confirm('Are you sure you want to delete this food entry?')) {
