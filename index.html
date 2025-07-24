@@ -4,8 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Tiny Eater</title>
-<meta name="theme-color" content="#84ADD8">
-<link rel="apple-touch-icon" href="icon-192.png">
+  
+  <!-- PWA Configuration -->
+  <meta name="theme-color" content="#84ADD8">
+  <link rel="manifest" href="manifest.json">
+  
+  <!-- iOS specific meta tags -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Tiny Eater">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  
+  <!-- Additional PWA meta tags -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="application-name" content="Tiny Eater">
+  
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=KoHo:wght@200;300;400;500;600;700&display=swap" rel="stylesheet"> 
@@ -194,10 +207,10 @@
   <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
   </svg>
-  <span class="text-sm text-gray-700">Loved It</span>
+  <span class="text-sm text-gray-700">Loved</span>
 </button>
 
-<button type="button" onclick="setReaction('indifferent')" id="reaction-indifferent" 
+<button type="button" onclick="setReaction('Meh')" id="reaction-Meh" 
         class="flex-1 px-3 py-3 rounded-full border-2 transition-all border-gray-200 hover:border-gray-300">
   <svg class="w-4 h-4 inline-block mr-1" fill="currentColor" viewBox="0 0 24 24">
     <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
@@ -205,7 +218,7 @@
     <circle cx="15" cy="9" r="1"/>
     <line x1="9" y1="15" x2="15" y2="15" stroke="currentColor" stroke-width="2"/>
   </svg>
-  <span class="text-sm text-gray-700">Indifferent</span>
+  <span class="text-sm text-gray-700">Meh</span>
 </button>
 
 <button type="button" onclick="setReaction('hated')" id="reaction-hated" 
@@ -216,7 +229,7 @@
     <circle cx="15" cy="9" r="1"/>
     <path d="M16 16s-1.5-2-4-2-4 2-4 2" stroke="currentColor" stroke-width="2" fill="none"/>
   </svg>
-  <span class="text-sm text-gray-700">Hated It</span>
+  <span class="text-sm text-gray-700">Hated</span>
 </button>
         </div>
       </div>
@@ -375,7 +388,7 @@
         if (sortBy === 'name') {
           return a.name.localeCompare(b.name);
         } else if (sortBy === 'rating') {
-          const ratingOrder = { 'loved': 3, 'indifferent': 2, 'hated': 1 };
+          const ratingOrder = { 'loved': 3, 'Meh': 2, 'hated': 1 };
           return (ratingOrder[b.reaction] || 0) - (ratingOrder[a.reaction] || 0);
         } else {
           return new Date(b.date) - new Date(a.date);
@@ -491,7 +504,7 @@
     function getReactionColor(reaction) {
       switch(reaction) {
         case 'loved': return 'bg-tiny-green';
-        case 'indifferent': return 'bg-tiny-gray';
+        case 'Meh': return 'bg-tiny-gray';
         case 'hated': return 'bg-tiny-red';
         default: return 'bg-gray-300';
       }
@@ -499,9 +512,9 @@
 
     function getReactionDisplay(reaction) {
       const reactions = {
-        'loved': { emoji: '😍', label: 'Loved It', color: 'bg-tiny-green' },
-        'indifferent': { emoji: '😐', label: 'Indifferent', color: 'bg-tiny-gray' },
-        'hated': { emoji: '😠', label: 'Hated It', color: 'bg-tiny-red' }
+        'loved': { emoji: '😍', label: 'Loved', color: 'bg-tiny-green' },
+        'Meh': { emoji: '😐', label: 'Meh', color: 'bg-tiny-gray' },
+        'hated': { emoji: '😠', label: 'Hated', color: 'bg-tiny-red' }
       };
       
       const r = reactions[reaction];
@@ -641,7 +654,7 @@
       if (btn) {
         const colors = {
           'loved': 'bg-tiny-yellow-light border-tiny-yellow',
-          'indifferent': 'bg-tiny-yellow-light border-tiny-yellow',
+          'Meh': 'bg-tiny-yellow-light border-tiny-yellow',
           'hated': 'bg-tiny-yellow-light border-tiny-yellow'
         };
         btn.className = `flex-1 p-3 rounded-full border-2 transition-all text-center ${colors[reaction]}`;
