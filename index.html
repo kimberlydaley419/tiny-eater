@@ -372,11 +372,21 @@
       throw new Error("LocalStorage not supported");
     }
     
+    // Check available storage space
+    const testData = JSON.stringify(foods);
+    console.log('Trying to save foods data, size:', testData.length, 'characters');
+    
     // Try to save with retry logic for mobile
     const foodsData = JSON.stringify(foods);
     const profileData = JSON.stringify(profile);
     const checklistData = JSON.stringify(checklist);
     
+    // Clear old data first to make space
+    localStorage.removeItem('tinyEaterFoods');
+    localStorage.removeItem('tinyEaterProfile');
+    localStorage.removeItem('tinyEaterChecklist');
+    
+    // Save new data
     localStorage.setItem('tinyEaterFoods', foodsData);
     localStorage.setItem('tinyEaterProfile', profileData);
     localStorage.setItem('tinyEaterChecklist', checklistData);
@@ -387,26 +397,49 @@
       throw new Error("Data verification failed");
     }
     
+    console.log('Data saved successfully');
+    
   } catch (error) {
     console.error('LocalStorage error:', error);
     
-    // Fallback: Try to clear some space and retry once
-    try {
-      // Clear old data that might be corrupted
-      localStorage.removeItem('tinyEaterFoods');
-      localStorage.removeItem('tinyEaterProfile');
-      localStorage.removeItem('tinyEaterChecklist');
-      
-      // Try saving again
-      localStorage.setItem('tinyEaterFoods', JSON.stringify(foods));
-      localStorage.setItem('tinyEaterProfile', JSON.stringify(profile));
-      localStorage.setItem('tinyEaterChecklist', JSON.stringify(checklist));
-      
-    } catch (retryError) {
-      console.error('Retry save failed:', retryError);
-      throw new Error('Unable to save data. Please check your device storage.');
+    // Show user-friendly error
+    if (error.message.includes('quota') || error.message.includes('storage') || error.name === 'QuotaExceededError') {
+      alert('Storage space is full. Try deleting some old photos or foods to make space.');
+    } else {
+      alert('Error saving data: ' + error.message);
     }
+    
+    // Re-throw the error so saveFood can handle it
+    throw error;
   }
+}
+
+function compressImage(file, maxWidth = 800, quality = 0.8) {
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    
+    img.onload = () => {
+      // Calculate new dimensions
+      let { width, height } = img;
+      
+      if (width > maxWidth) {
+        height = (height * maxWidth) / width;
+        width = maxWidth;
+      }
+      
+      canvas.width = width;
+      canvas.height = height;
+      
+      // Draw and compress
+      ctx.drawImage(img, 0, 0, width, height);
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+      resolve(compressedDataUrl);
+    };
+    
+    img.src = URL.createObjectURL(file);
+  });
 }
 
     // Tab management
@@ -730,22 +763,29 @@
 }
 
     function handlePhotoUpload(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        currentMediaPreview = e.target.result;
-        const preview = document.getElementById('photo-preview');
-        const isImage = file.type.startsWith('image/');
-        
-        preview.innerHTML = isImage ? 
-          `<img src="${e.target.result}" alt="Preview" class="w-32 h-32 object-contain rounded-lg">` :
-          `<video src="${e.target.result}" class="w-32 h-32 object-contain rounded-lg" controls></video>`;
-        preview.classList.remove('hidden');
-      };
-      reader.readAsDataURL(file);
-    }
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  // Compress images before storing
+  if (file.type.startsWith('image/')) {
+    compressImage(file).then(compressedDataUrl => {
+      currentMediaPreview = compressedDataUrl;
+      const preview = document.getElementById('photo-preview');
+      preview.innerHTML = `<img src="${compressedDataUrl}" alt="Preview" class="w-32 h-32 object-contain rounded-lg">`;
+      preview.classList.remove('hidden');
+    });
+  } else {
+    // Handle videos normally (they're usually smaller)
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      currentMediaPreview = e.target.result;
+      const preview = document.getElementById('photo-preview');
+      preview.innerHTML = `<video src="${e.target.result}" class="w-32 h-32 object-contain rounded-lg" controls></video>`;
+      preview.classList.remove('hidden');
+    };
+    reader.readAsDataURL(file);
+  }
+}
 
     function saveFood() {
   // Prevent multiple saves
