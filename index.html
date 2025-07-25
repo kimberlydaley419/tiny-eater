@@ -324,23 +324,90 @@
 
     // Data persistence
     function loadData() {
-      const savedFoods = localStorage.getItem('tinyEaterFoods');
-      const savedProfile = localStorage.getItem('tinyEaterProfile');
-      const savedChecklist = localStorage.getItem('tinyEaterChecklist');
-      
-      if (savedFoods) foods = JSON.parse(savedFoods);
-      if (savedProfile) {
-        profile = JSON.parse(savedProfile);
-        document.getElementById('profile-name').value = profile.name;
+  try {
+    const savedFoods = localStorage.getItem('tinyEaterFoods');
+    const savedProfile = localStorage.getItem('tinyEaterProfile');
+    const savedChecklist = localStorage.getItem('tinyEaterChecklist');
+    
+    if (savedFoods && savedFoods !== 'undefined') {
+      try {
+        foods = JSON.parse(savedFoods);
+      } catch (e) {
+        console.error('Error parsing foods data:', e);
+        foods = [];
       }
-      if (savedChecklist) checklist = JSON.parse(savedChecklist);
     }
+    
+    if (savedProfile && savedProfile !== 'undefined') {
+      try {
+        profile = JSON.parse(savedProfile);
+        document.getElementById('profile-name').value = profile.name || '';
+      } catch (e) {
+        console.error('Error parsing profile data:', e);
+        profile = { name: '' };
+      }
+    }
+    
+    if (savedChecklist && savedChecklist !== 'undefined') {
+      try {
+        checklist = JSON.parse(savedChecklist);
+      } catch (e) {
+        console.error('Error parsing checklist data:', e);
+        checklist = {};
+      }
+    }
+  } catch (error) {
+    console.error('Error loading data:', error);
+    // Initialize with empty data if loading fails
+    foods = [];
+    profile = { name: '' };
+    checklist = {};
+  }
+}
 
     function saveData() {
+  try {
+    // Test if localStorage is available and working
+    if (typeof(Storage) === "undefined") {
+      throw new Error("LocalStorage not supported");
+    }
+    
+    // Try to save with retry logic for mobile
+    const foodsData = JSON.stringify(foods);
+    const profileData = JSON.stringify(profile);
+    const checklistData = JSON.stringify(checklist);
+    
+    localStorage.setItem('tinyEaterFoods', foodsData);
+    localStorage.setItem('tinyEaterProfile', profileData);
+    localStorage.setItem('tinyEaterChecklist', checklistData);
+    
+    // Test that the data was actually saved
+    const testSave = localStorage.getItem('tinyEaterFoods');
+    if (!testSave || testSave !== foodsData) {
+      throw new Error("Data verification failed");
+    }
+    
+  } catch (error) {
+    console.error('LocalStorage error:', error);
+    
+    // Fallback: Try to clear some space and retry once
+    try {
+      // Clear old data that might be corrupted
+      localStorage.removeItem('tinyEaterFoods');
+      localStorage.removeItem('tinyEaterProfile');
+      localStorage.removeItem('tinyEaterChecklist');
+      
+      // Try saving again
       localStorage.setItem('tinyEaterFoods', JSON.stringify(foods));
       localStorage.setItem('tinyEaterProfile', JSON.stringify(profile));
       localStorage.setItem('tinyEaterChecklist', JSON.stringify(checklist));
+      
+    } catch (retryError) {
+      console.error('Retry save failed:', retryError);
+      throw new Error('Unable to save data. Please check your device storage.');
     }
+  }
+}
 
     // Tab management
     function setTab(tab) {
