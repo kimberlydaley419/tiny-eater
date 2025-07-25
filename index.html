@@ -314,103 +314,191 @@
       ]
     };
 
-    // Initialize app
-    document.addEventListener('DOMContentLoaded', function() {
-      loadData();
-      updatePersonalization();
-      renderFoods();
-      renderChecklist();
-    });
+// IndexedDB Storage System
+class TinyEaterDB {
+  constructor() {
+    this.dbName = 'TinyEaterDB';
+    this.version = 1;
+    this.db = null;
+  }
 
-    // Data persistence
-    function loadData() {
-  try {
-    const savedFoods = localStorage.getItem('tinyEaterFoods');
-    const savedProfile = localStorage.getItem('tinyEaterProfile');
-    const savedChecklist = localStorage.getItem('tinyEaterChecklist');
-    
-    if (savedFoods && savedFoods !== 'undefined') {
-      try {
-        foods = JSON.parse(savedFoods);
-      } catch (e) {
-        console.error('Error parsing foods data:', e);
-        foods = [];
-      }
+  async init() {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open(this.dbName, this.version);
+      
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        this.db = request.result;
+        resolve(this.db);
+      };
+      
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        
+        // Create object stores
+        if (!db.objectStoreNames.contains('foods')) {
+          db.createObjectStore('foods', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('settings')) {
+          db.createObjectStore('settings', { keyPath: 'key' });
+        }
+      };
+    });
+  }
+
+  async saveFood(food) {
+    const transaction = this.db.transaction(['foods'], 'readwrite');
+    const store = transaction.objectStore('foods');
+    return store.put(food);
+  }
+
+  async getAllFoods() {
+    const transaction = this.db.transaction(['foods'], 'readonly');
+    const store = transaction.objectStore('foods');
+    return new Promise((resolve, reject) => {
+      const request = store.getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async deleteFood(id) {
+    const transaction = this.db.transaction(['foods'], 'readwrite');
+    const store = transaction.objectStore('foods');
+    return store.delete(id);
+  }
+
+  async saveSetting(key, value) {
+    const transaction = this.db.transaction(['settings'], 'readwrite');
+    const store = transaction.objectStore('settings');
+    return store.put({ key, value });
+  }
+
+  async getSetting(key) {
+    const transaction = this.db.transaction(['settings'], 'readonly');
+    const store = transaction.objectStore('settings');
+    return new Promise((resolve, reject) => {
+      const request = store.get(key);
+      request.onsuccess = () => {
+        resolve(request.result ? request.result.value : null);
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getStorageInfo() {
+    try {
+      const foods = await this.getAllFoods();
+      const foodsSize = JSON.stringify(foods).length;
+      
+      console.log(`IndexedDB usage: ${Math.round(foodsSize/1024)}KB foods`);
+      console.log(`Foods count: ${foods.length}, Average per food: ${Math.round(foodsSize/foods.length/1024)}KB`);
+      
+      return {
+        totalFoods: foods.length,
+        estimatedSize: foodsSize,
+        canAddMore: foodsSize < 50000000 // 50MB limit
+      };
+    } catch (error) {
+      console.error('Storage check failed:', error);
+      return { totalFoods: 0, estimatedSize: 0, canAddMore: true };
     }
-    
-    if (savedProfile && savedProfile !== 'undefined') {
-      try {
-        profile = JSON.parse(savedProfile);
-        document.getElementById('profile-name').value = profile.name || '';
-      } catch (e) {
-        console.error('Error parsing profile data:', e);
-        profile = { name: '' };
-      }
-    }
-    
-    if (savedChecklist && savedChecklist !== 'undefined') {
-      try {
-        checklist = JSON.parse(savedChecklist);
-      } catch (e) {
-        console.error('Error parsing checklist data:', e);
-        checklist = {};
-      }
-    }
-  } catch (error) {
-    console.error('Error loading data:', error);
-    // Initialize with empty data if loading fails
-    foods = [];
-    profile = { name: '' };
-    checklist = {};
   }
 }
 
-    function saveData() {
+// Initialize database
+const tinyEaterDB = new TinyEaterDB();
+
+    // Initialize app
+    document.addEventListener('DOMContentLoaded', async function() {
+  await loadData();
+  updatePersonalization();
+  renderFoods();
+  renderChecklist();
+});
+
+    // Data persistence
+    async function loadData() {
   try {
-    // Test if localStorage is available and working
-    if (typeof(Storage) === "undefined") {
-      throw new Error("LocalStorage not supported");
+    // Initialize IndexedDB
+    await tinyEaterDB.init();
+    
+    // Load foods from IndexedDB
+    const savedFoods = await tinyEaterDB.getAllFoods();
+    foods = savedFoods || [];
+    
+    // Load profile and checklist from IndexedDB
+    const savedProfile = await tinyEaterDB.getSetting('profile');
+    const savedChecklist = await tinyEaterDB.getSetting('checklist');
+    
+    if (savedProfile) {
+      profile = savedProfile;
+      document.getElementById('profile-name').value = profile.name || '';
     }
     
-    // Check available storage space
-    const testData = JSON.stringify(foods);
-    console.log('Trying to save foods data, size:', testData.length, 'characters');
-    
-    // Try to save with retry logic for mobile
-    const foodsData = JSON.stringify(foods);
-    const profileData = JSON.stringify(profile);
-    const checklistData = JSON.stringify(checklist);
-    
-    // Clear old data first to make space
-    localStorage.removeItem('tinyEaterFoods');
-    localStorage.removeItem('tinyEaterProfile');
-    localStorage.removeItem('tinyEaterChecklist');
-    
-    // Save new data
-    localStorage.setItem('tinyEaterFoods', foodsData);
-    localStorage.setItem('tinyEaterProfile', profileData);
-    localStorage.setItem('tinyEaterChecklist', checklistData);
-    
-    // Test that the data was actually saved
-    const testSave = localStorage.getItem('tinyEaterFoods');
-    if (!testSave || testSave !== foodsData) {
-      throw new Error("Data verification failed");
+    if (savedChecklist) {
+      checklist = savedChecklist;
     }
     
-    console.log('Data saved successfully');
+    console.log(`Loaded ${foods.length} foods from IndexedDB`);
     
   } catch (error) {
-    console.error('LocalStorage error:', error);
+    console.error('Error loading data from IndexedDB:', error);
+    // Fallback to localStorage if IndexedDB fails
+    try {
+      const savedFoods = localStorage.getItem('tinyEaterFoods');
+      const savedProfile = localStorage.getItem('tinyEaterProfile');
+      const savedChecklist = localStorage.getItem('tinyEaterChecklist');
+      
+      if (savedFoods) foods = JSON.parse(savedFoods);
+      if (savedProfile) {
+        profile = JSON.parse(savedProfile);
+        document.getElementById('profile-name').value = profile.name || '';
+      }
+      if (savedChecklist) checklist = JSON.parse(savedChecklist);
+      
+      console.log('Loaded data from localStorage fallback');
+    } catch (fallbackError) {
+      console.error('Fallback failed:', fallbackError);
+      foods = [];
+      profile = { name: '' };
+      checklist = {};
+    }
+  }
+}
+
+    async function saveData() {
+  try {
+    // Save to IndexedDB (much larger storage)
+    await tinyEaterDB.saveSetting('profile', profile);
+    await tinyEaterDB.saveSetting('checklist', checklist);
     
-    // Show user-friendly error
-    if (error.message.includes('quota') || error.message.includes('storage') || error.name === 'QuotaExceededError') {
-      alert('Storage space is full. Try deleting some old photos or foods to make space.');
-    } else {
-      alert('Error saving data: ' + error.message);
+    // Note: Individual foods are saved in saveFood function
+    
+    // Also save to localStorage as backup (for compatibility)
+    try {
+      localStorage.setItem('tinyEaterProfile', JSON.stringify(profile));
+      localStorage.setItem('tinyEaterChecklist', JSON.stringify(checklist));
+    } catch (localStorageError) {
+      // localStorage full, but IndexedDB worked, so we're good
+      console.log('localStorage full, but IndexedDB saved successfully');
     }
     
-    // Re-throw the error so saveFood can handle it
-    throw error;
+    console.log('Data saved to IndexedDB successfully');
+    
+  } catch (error) {
+    console.error('IndexedDB save failed:', error);
+    
+    // Fallback to localStorage
+    try {
+      localStorage.setItem('tinyEaterProfile', JSON.stringify(profile));
+      localStorage.setItem('tinyEaterChecklist', JSON.stringify(checklist));
+      console.log('Saved to localStorage fallback');
+    } catch (fallbackError) {
+      console.error('All storage methods failed:', fallbackError);
+      alert('Unable to save data. Storage may be full.');
+      throw fallbackError;
+    }
   }
 }
 
@@ -787,7 +875,7 @@ function compressImage(file, maxWidth = 800, quality = 0.8) {
   }
 }
 
-    function saveFood() {
+    async function saveFood() {
   // Prevent multiple saves
   if (isSaving) return;
   isSaving = true;
@@ -817,7 +905,6 @@ function compressImage(file, maxWidth = 800, quality = 0.8) {
   }
   
   if (!currentReaction) {
-    // Add error display for missing reaction
     const reactionContainer = document.querySelector('[id^="reaction-"]').parentElement;
     if (reactionContainer) {
       const errorDiv = document.createElement('div');
@@ -830,7 +917,6 @@ function compressImage(file, maxWidth = 800, quality = 0.8) {
   }
   
   if (hasErrors) {
-    // Re-enable button if there are errors
     saveButton.disabled = false;
     saveButton.textContent = originalText;
     isSaving = false;
@@ -848,38 +934,47 @@ function compressImage(file, maxWidth = 800, quality = 0.8) {
     };
     
     if (editingFood) {
+      // Update existing food
+      foodData.id = editingFood.id;
+      foodData.dateAdded = editingFood.dateAdded;
+      
+      // Update in memory
       const index = foods.findIndex(f => f.id === editingFood.id);
       if (index !== -1) {
-        foods[index] = { ...foodData, id: editingFood.id, dateAdded: editingFood.dateAdded };
+        foods[index] = foodData;
       }
     } else {
-      foodData.id = Date.now() + Math.random(); // Ensure unique ID
+      // Add new food
+      foodData.id = Date.now() + Math.random();
       foodData.dateAdded = new Date().toISOString();
       foods.unshift(foodData);
     }
     
-    // Save data with error handling
+    // Save to IndexedDB
     try {
-      saveData();
+      await tinyEaterDB.saveFood(foodData);
+      console.log('Food saved to IndexedDB');
     } catch (error) {
-      console.error('Error saving data:', error);
+      console.error('IndexedDB save failed:', error);
       alert('Error saving food. Please try again.');
-      // Re-enable button on save error
       saveButton.disabled = false;
       saveButton.textContent = originalText;
       isSaving = false;
       return;
     }
     
-    // Only render and close if save was successful
+    // Update display and close modal
     renderFoods();
     closeModal();
+    
+    // Show storage info
+    const storageInfo = await tinyEaterDB.getStorageInfo();
+    console.log(`Storage: ${storageInfo.totalFoods} foods, ~${Math.round(storageInfo.estimatedSize/1024)}KB used`);
     
   } catch (error) {
     console.error('Error in saveFood:', error);
     alert('An error occurred. Please try again.');
   } finally {
-    // Always re-enable the button and reset saving state
     saveButton.disabled = false;
     saveButton.textContent = originalText;
     isSaving = false;
@@ -905,13 +1000,23 @@ function setReaction(reaction) {
   }
 }
 
-    function deleteFood(id) {
-      if (confirm('Are you sure you want to delete this food entry?')) {
-        foods = foods.filter(f => f.id !== id);
-        saveData();
-        renderFoods();
-      }
+    async function deleteFood(id) {
+  if (confirm('Are you sure you want to delete this food entry?')) {
+    try {
+      // Remove from IndexedDB
+      await tinyEaterDB.deleteFood(id);
+      
+      // Remove from memory
+      foods = foods.filter(f => f.id !== id);
+      
+      renderFoods();
+      console.log('Food deleted successfully');
+    } catch (error) {
+      console.error('Error deleting food:', error);
+      alert('Error deleting food. Please try again.');
     }
+  }
+}
 
     // Checklist management
     function renderChecklist() {
