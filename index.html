@@ -214,7 +214,7 @@
   <span class="text-sm text-gray-700">Loved</span>
 </button>
 
-<button type="button" onclick="setReaction('Meh')" id="reaction-Meh" 
+<button type="button" onclick="setReaction('meh')" id="reaction-meh" 
         class="flex-1 px-3 py-3 rounded-full border-2 transition-all border-gray-200 hover:border-gray-300">
   <svg class="w-4 h-4 inline-block mr-1" fill="currentColor" viewBox="0 0 24 24">
     <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
@@ -460,7 +460,7 @@
         if (sortBy === 'name') {
           return a.name.localeCompare(b.name);
         } else if (sortBy === 'rating') {
-          const ratingOrder = { 'loved': 3, 'Meh': 2, 'hated': 1 };
+          const ratingOrder = { 'loved': 3, 'meh': 2, 'hated': 1 };
           return (ratingOrder[b.reaction] || 0) - (ratingOrder[a.reaction] || 0);
         } else {
           return new Date(b.date) - new Date(a.date);
@@ -576,7 +576,7 @@
     function getReactionColor(reaction) {
       switch(reaction) {
         case 'loved': return 'bg-tiny-green';
-        case 'Meh': return 'bg-tiny-gray';
+        case 'meh': return 'bg-tiny-gray';
         case 'hated': return 'bg-tiny-red';
         default: return 'bg-gray-300';
       }
@@ -585,7 +585,7 @@
     function getReactionDisplay(reaction) {
       const reactions = {
         'loved': { emoji: '😍', label: 'Loved', color: 'bg-tiny-green' },
-        'Meh': { emoji: '😐', label: 'Meh', color: 'bg-tiny-gray' },
+        'meh': { emoji: '😐', label: 'Meh', color: 'bg-tiny-gray' },
         'hated': { emoji: '😠', label: 'Hated', color: 'bg-tiny-red' }
       };
       
